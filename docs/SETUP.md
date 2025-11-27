@@ -3,79 +3,51 @@
 ## 1. Hardware Setup
 1.  **Tapo H100 Hub**: Plug in the hub and set it up using the Tapo app.
 2.  **Tapo T100 Sensors**: Pair your PIR sensors with the H100 hub using the Tapo app.
-3.  **Enable Matter**: In the Tapo app, go to the H100 hub settings and enable Matter/Bind to Matter. Note the pairing code.
+3.  **Note the Hub's IP Address**: You'll need this for configuration (find it in your router or Tapo app).
 
-## 2. Matter Server Setup
-This project requires a running Matter Server. The recommended way is to use the official Python Matter Server via Docker.
-
-### Installing Docker (Convenience Script)
-If you don't have Docker installed, you can use the official convenience script:
-```bash
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-# Log out and back in, or run:
-newgrp docker
-```
-
-### Running the Server
-Once Docker is ready:
-```bash
-docker run -d \
-  --name matter-server \
-  --restart=unless-stopped \
-  --net=host \
-  -v $(pwd)/matter_data:/data \
-  ghcr.io/home-assistant-libs/python-matter-server:stable
-```
-*Note: `--net=host` is required for mDNS discovery.*
-
-Alternatively, you can run it directly if you have the dependencies installed using the provided script:
-```bash
-./run_matter_server.sh
-```
-
-> [!WARNING]
-> If you encounter `CHIP handle has not been initialized!` or core dumps when running locally, it indicates an incompatibility with your system libraries. In this case, **you must use the Docker method** or run the Matter Server on a different machine (e.g., Raspberry Pi).
-
-If running on a different machine, update the `MATTER_SERVER_URL` environment variable in the backend:
-```bash
-export MATTER_SERVER_URL="ws://<IP_ADDRESS>:5580/ws"
-```
-
-## 3. Backend Setup
-1.  Navigate to the `backend` directory.
-2.  Create a virtual environment (optional but recommended):
+## 2. Backend Setup
+1.  Create a virtual environment (recommended):
     ```bash
     python3 -m venv venv
     source venv/bin/activate
     ```
-3.  Install dependencies:
+2.  Install dependencies:
     ```bash
-    pip install -r requirements.txt
-    ```
-4.  Run the backend server:
-    ```bash
-    uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    pip install -r backend/requirements.txt
     ```
 
-## 4. Frontend Setup
-1.  Navigate to the `frontend` directory.
-2.  Install Node.js (if not already installed).
-3.  Install dependencies:
+## 3. Frontend Setup
+1.  Install Node.js (if not already installed).
+2.  Install dependencies:
     ```bash
+    cd frontend
     npm install
+    cd ..
     ```
-4.  Run the development server:
-    ```bash
-    npm run dev
-    ```
-5.  Open your browser to `http://localhost:5173`.
 
-## 5. Pairing the Hub
-1.  Once the Matter Server and Backend are running, you need to pair the Tapo H100 hub to the Matter Server.
-2.  You can use the Matter Server's CLI or UI (if available) to commission the device using the pairing code from Step 1.
-3.  Once paired, the `matter_client.py` in the backend will automatically detect the sensors and start logging activity.
+## 4. Quick Start
+Use the provided startup script to run both backend and frontend:
+```bash
+./start.sh
+```
+
+This will start:
+- Backend API on `http://localhost:8000`
+- Frontend Dashboard on `http://localhost:5173`
+
+## 5. Configure Tapo Hub Connection
+1.  Open your browser to `http://localhost:5173`
+2.  Click the **⚙️** (Settings) button
+3.  Enter your Tapo Hub credentials:
+    - **Hub IP Address**: The local IP of your Tapo H100 hub (find this in your router or Tapo app)
+    - **Username**: Your Tapo account email
+    - **Password**: Your Tapo account password
+4.  Click "Save & Connect"
+
+The system will automatically connect to your hub and start monitoring sensor activity.
+
+> [!NOTE]
+> **No Matter Server Required**: This application uses the Tapo native API via the `tapo-py` library to communicate directly with your hub. The Matter protocol integration mentioned in earlier versions is no longer needed.
 
 ## 6. Using the Dashboard
 - The dashboard will show a list of detected sensors.
