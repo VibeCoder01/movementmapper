@@ -51,6 +51,7 @@ The system will automatically connect to your hub and start monitoring sensor ac
 
 ## 6. Using the Dashboard
 - The dashboard will show a list of detected sensors.
-- **Activity Graph**: Shows activity events over time.
-- **Heatmap**: Shows activity intensity by hour and day.
-- **Anomalies**: The system analyzes patterns and flags unusual activity. You can trigger analysis manually via the "Run Analysis" button.
+- **Heatmap**: Visualize activity intensity by hour and day of the week.
+- **Aggregate Mode**: Combine data from multiple weeks to identify patterns.
+- **Sum Mode**: Toggle to see total activity counts per hour in aggregate view.
+- **Data Adjustments**: Manually adjust data points to correct anomalies or false positives.
