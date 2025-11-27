@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+sqlalchemy
+python-matter-server
+scikit-learn
+pandas
+pydantic
+tapo
