@@ -33,6 +33,19 @@ For detailed installation, hardware requirements, and configuration instructions
 *   **Frontend**: React, Vite, TailwindCSS
 *   **Integration**: `tapo-py` library for direct hub communication
 
+## Acknowledgements
+
+This project is built on top of several excellent open-source libraries:
+
+*   **[tapo-py](https://github.com/mihai-dinculescu/tapo)** - Python library for Tapo device integration by Mihai Dinculescu
+*   **[FastAPI](https://fastapi.tiangolo.com/)** - Modern, fast web framework for building APIs
+*   **[React](https://react.dev/)** - JavaScript library for building user interfaces
+*   **[Vite](https://vitejs.dev/)** - Next generation frontend tooling
+*   **[TailwindCSS](https://tailwindcss.com/)** - Utility-first CSS framework
+*   **[SQLAlchemy](https://www.sqlalchemy.org/)** - Python SQL toolkit and ORM
+
+Special thanks to the Tapo community for reverse-engineering the protocol and making local control possible.
+
 ## License
 
 MIT
