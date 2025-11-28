@@ -19,10 +19,12 @@ class TapoClient:
         self.client = None
         self.hub = None
         self.last_states = {}  # Track last known state of each sensor
+        self.last_error = None # Track last connection error
         
     async def start(self):
         """Start polling Tapo hub for sensor events"""
         self.running = True
+        self.last_error = None
         logger.info(f"Starting Tapo client for hub at {self.hub_ip}")
         
         try:
@@ -40,14 +42,20 @@ class TapoClient:
             while self.running:
                 try:
                     await self._poll_sensors()
+                    # Clear error if polling succeeds
+                    if self.last_error:
+                        self.last_error = None
                 except Exception as e:
                     logger.error(f"Error polling Tapo sensors: {e}")
+                    self.last_error = str(e)
                 
                 await asyncio.sleep(2)  # Poll every 2 seconds for responsive detection
                 
         except Exception as e:
+            error_msg = str(e)
             logger.error(f"Failed to connect to Tapo hub: {e}")
             logger.error("Please check your credentials in config.py")
+            self.last_error = error_msg
     
     def stop(self):
         self.running = False

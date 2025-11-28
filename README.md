@@ -9,6 +9,8 @@
 *   **Aggregate View**: Combine data from multiple weeks to identify consistent routines and long-term trends.
 *   **Sum Mode**: In Aggregate View, toggle "Sum Mode" to see the total activity count for each hour, providing a clear heat-map of high-traffic times.
 *   **Data Adjustments**: Manually adjust data points to correct false positives or anomalies directly from the dashboard.
+*   **Sensor Management**: Manually refresh sensor list to detect newly added devices immediately.
+*   **Diagnostics**: View backend logs directly from the settings panel for troubleshooting.
 *   **Privacy Focused**: All data is stored locally in a SQLite database. No external cloud dependency for data storage.
 
 ## Getting Started

@@ -110,6 +110,20 @@ def shutdown_event():
     if tapo_client:
         tapo_client.stop()
 
+@app.get("/status")
+def get_status():
+    from tapo_client import get_tapo_client
+    tapo_client = get_tapo_client()
+    
+    if not tapo_client:
+        return {"status": "not_configured", "error": "Tapo client not initialized"}
+        
+    return {
+        "status": "running" if tapo_client.running else "stopped",
+        "connected": tapo_client.hub is not None,
+        "error": tapo_client.last_error
+    }
+
 @app.get("/")
 def read_root():
     return {"message": "Matter Activity Logger API"}
@@ -354,3 +368,44 @@ def clear_demo_data(db: Session = Depends(get_db)):
         "logs_deleted": logs_deleted,
         "anomalies_deleted": anomalies_deleted
     }
+
+@app.post("/sensors/refresh")
+async def refresh_sensors():
+    """Force immediate sensor polling from Tapo hub"""
+    from tapo_client import get_tapo_client
+    tapo_client = get_tapo_client()
+    if not tapo_client:
+        raise HTTPException(status_code=503, detail="Tapo client not initialized")
+    
+    try:
+        # Force a poll of sensors
+        await tapo_client._poll_sensors()
+        return {"message": "Sensors refreshed successfully"}
+    except Exception as e:
+        logger.error(f"Error refreshing sensors: {e}")
+        raise HTTPException(status_code=500, detail=f"Error refreshing sensors: {str(e)}")
+
+@app.get("/logs/backend")
+def get_backend_logs(lines: int = 1000):
+    """Retrieve backend log file contents"""
+    # Try multiple locations for robustness
+    possible_paths = ["../backend.log", "backend.log", "/var/log/backend.log"]
+    log_file_path = None
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            log_file_path = path
+            break
+            
+    if not log_file_path:
+        return {"logs": f"Log file not found. Checked: {', '.join(possible_paths)}"}
+    
+    try:
+        with open(log_file_path, 'r') as f:
+            all_lines = f.readlines()
+            # Return last N lines
+            last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+            return {"logs": ''.join(last_lines)}
+    except Exception as e:
+        logger.error(f"Error reading log file: {e}")
+        raise HTTPException(status_code=500, detail=f"Error reading log file: {str(e)}")

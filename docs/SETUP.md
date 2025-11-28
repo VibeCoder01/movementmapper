@@ -55,3 +55,7 @@ The system will automatically connect to your hub and start monitoring sensor ac
 - **Aggregate Mode**: Combine data from multiple weeks to identify patterns.
 - **Sum Mode**: Toggle to see total activity counts per hour in aggregate view.
 - **Data Adjustments**: Manually adjust data points to correct anomalies or false positives.
+- **Settings & Diagnostics**:
+    - **Refresh Sensors**: Force the system to poll for new sensors immediately.
+    - **Display Logs**: View the backend logs to troubleshoot connection issues or verify system status.
+    - **Demo Data**: Generate or clear demo data for testing purposes.
