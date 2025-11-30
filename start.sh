@@ -1,7 +1,7 @@
 #!/bin/bash
 # Movement Mapper Startup Script
 
-cd /home/shaun/.gemini/antigravity/scratch/matter_logger
+cd /home/shaun/vc01/matter_logger
 
 echo "Starting Backend API..."
 cd backend
