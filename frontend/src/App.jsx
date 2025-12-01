@@ -83,7 +83,7 @@ function App() {
 
             // ... existing auto-select logic ...
             if (!isInitialized.current && sensorsRes.data.length > 0) {
-                setSelectedSensors(new Set(sensorsRes.data.map(s => s.id)));
+                setSelectedSensors(new Set(sensorsRes.data.filter(s => !s.is_hidden).map(s => s.id)));
                 isInitialized.current = true;
             }
 
@@ -136,7 +136,7 @@ function App() {
         setDemoLoading(true);
         try {
             const response = await axios.post('/api/demo/clear');
-            alert(response.data.message);
+            // alert(response.data.message); // Removed to improve UX
 
             // Reset local state immediately
             setLogs([]);
@@ -307,9 +307,14 @@ function App() {
         });
     }, [adjustments, selectedSensors, excludeToday, excludeFirstDay, todayStart, todayEnd, sensorFirstDates]);
 
+    const hiddenSensorIds = useMemo(() => {
+        return new Set(sensors.filter(s => s.is_hidden).map(s => s.id));
+    }, [sensors]);
+
     // Filter logs by selected sensors and optionally by week/4-week range
     const filteredLogs = logs.filter(log => {
         if (!selectedSensors.has(log.sensor_id)) return false;
+        if (hiddenSensorIds.has(log.sensor_id)) return false;
         const logDate = new Date(log.timestamp);
         if (isNaN(logDate.getTime())) return false;
         if (!(logDate >= weekStart && logDate < weekEnd)) return false;
@@ -394,6 +399,31 @@ function App() {
         setSelectedHeatmapCell({ day, hour, date });
     };
 
+    // Helper to filter logs for a specific cell
+    const getLogsForCell = (logsToFilter, cell) => {
+        if (!cell) return [];
+        return logsToFilter.filter(log => {
+            const d = new Date(log.timestamp);
+            const dayMatch = d.getDay() === cell.day && d.getHours() === cell.hour;
+            if (!dayMatch) return false;
+            if (log.value !== 'active') return false;
+            if (cell.date) {
+                return d.getFullYear() === cell.date.getFullYear() &&
+                    d.getMonth() === cell.date.getMonth() &&
+                    d.getDate() === cell.date.getDate();
+            }
+            return true;
+        });
+    };
+
+    // Helper to delete adjustments
+    const deleteAdjustments = async (ids) => {
+        if (!ids || ids.length === 0) return;
+        for (const id of ids) {
+            await axios.delete(`/api/adjustments/${id}`);
+        }
+    };
+
 
 
     const handleSaveAdjustment = async (newValue, comment) => {
@@ -417,9 +447,7 @@ function App() {
             // Consolidate adjustments: Delete all existing adjustments for this slot first
             // This ensures we don't have duplicates with slightly different timestamps
             if (adjustmentTarget.currentAdjustment && adjustmentTarget.currentAdjustment.ids) {
-                for (const id of adjustmentTarget.currentAdjustment.ids) {
-                    await axios.delete(`/api/adjustments/${id}`);
-                }
+                await deleteAdjustments(adjustmentTarget.currentAdjustment.ids);
             }
 
             const response = await axios.post('/api/adjustments', {
@@ -447,9 +475,7 @@ function App() {
         try {
             // Delete all adjustments for this slot (using ids array)
             if (adjustmentTarget.currentAdjustment.ids) {
-                for (const id of adjustmentTarget.currentAdjustment.ids) {
-                    await axios.delete(`/api/adjustments/${id}`);
-                }
+                await deleteAdjustments(adjustmentTarget.currentAdjustment.ids);
             }
             console.log('Adjustment(s) deleted successfully');
             await fetchData();
@@ -588,6 +614,7 @@ function App() {
                 onClearDemo={clearDemoData}
                 onFetchHistorical={() => axios.post('/api/logs/fetch-historical').then(() => fetchData())}
                 demoLoading={demoLoading}
+                onRefreshData={fetchData}
             />
 
 
@@ -603,7 +630,7 @@ function App() {
                         </div>
                     </div>
                     <div className="space-y-3">
-                        {sensors.map(sensor => (
+                        {sensors.filter(s => !s.is_hidden).map(sensor => (
                             <div key={sensor.id} className="flex items-start gap-3">
                                 <input
                                     type="checkbox"
@@ -617,7 +644,7 @@ function App() {
                                 </div>
                             </div>
                         ))}
-                        {sensors.length === 0 && <p className="text-gray-500 italic">No sensors found.</p>}
+                        {sensors.filter(s => !s.is_hidden).length === 0 && <p className="text-gray-500 italic">No sensors found.</p>}
                     </div>
                 </div>
 
@@ -630,51 +657,27 @@ function App() {
                         {selectedHeatmapCell ? (
                             <>
                                 {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][selectedHeatmapCell.day]} at {selectedHeatmapCell.hour}:00
-                                {filteredLogs.filter(log => {
-                                    const d = new Date(log.timestamp);
-                                    const dayMatch = d.getDay() === selectedHeatmapCell.day && d.getHours() === selectedHeatmapCell.hour;
-                                    if (!dayMatch) return false;
-                                    if (log.value !== 'active') return false;
-                                    if (selectedHeatmapCell.date) {
-                                        // Compare year, month, date
-                                        return d.getFullYear() === selectedHeatmapCell.date.getFullYear() &&
-                                            d.getMonth() === selectedHeatmapCell.date.getMonth() &&
-                                            d.getDate() === selectedHeatmapCell.date.getDate();
-                                    }
-                                    if (log.value !== 'active') return false;
-                                    return true;
-                                }).length > 0 && (
-                                        <div className="text-sm font-normal text-gray-600 mt-1">
-                                            {(() => {
-                                                const matchingLogs = filteredLogs.filter(log => {
-                                                    const d = new Date(log.timestamp);
-                                                    const dayMatch = d.getDay() === selectedHeatmapCell.day && d.getHours() === selectedHeatmapCell.hour;
-                                                    if (!dayMatch) return false;
-                                                    if (log.value !== 'active') return false;
-                                                    if (selectedHeatmapCell.date) {
-                                                        return d.getFullYear() === selectedHeatmapCell.date.getFullYear() &&
-                                                            d.getMonth() === selectedHeatmapCell.date.getMonth() &&
-                                                            d.getDate() === selectedHeatmapCell.date.getDate();
-                                                    }
-                                                    return true;
-                                                });
-                                                if (matchingLogs.length > 0) {
-                                                    const dates = [...new Set(matchingLogs.map(log =>
-                                                        new Date(log.timestamp).toLocaleDateString('en-US', {
-                                                            weekday: 'long',
-                                                            year: 'numeric',
-                                                            month: 'long',
-                                                            day: 'numeric'
-                                                        })
-                                                    ))];
-                                                    return dates.length === 1
-                                                        ? dates[0]
-                                                        : `${dates.length} dates: ${dates.join(', ')}`;
-                                                }
-                                                return '';
-                                            })()}
-                                        </div>
-                                    )}
+                                {getLogsForCell(filteredLogs, selectedHeatmapCell).length > 0 && (
+                                    <div className="text-sm font-normal text-gray-600 mt-1">
+                                        {(() => {
+                                            const matchingLogs = getLogsForCell(filteredLogs, selectedHeatmapCell);
+                                            if (matchingLogs.length > 0) {
+                                                const dates = [...new Set(matchingLogs.map(log =>
+                                                    new Date(log.timestamp).toLocaleDateString('en-US', {
+                                                        weekday: 'long',
+                                                        year: 'numeric',
+                                                        month: 'long',
+                                                        day: 'numeric'
+                                                    })
+                                                ))];
+                                                return dates.length === 1
+                                                    ? dates[0]
+                                                    : `${dates.length} dates: ${dates.join(', ')}`;
+                                            }
+                                            return '';
+                                        })()}
+                                    </div>
+                                )}
                             </>
                         ) : 'Heatmap Details'}
                     </h2>
@@ -683,19 +686,7 @@ function App() {
                         <div className="space-y-4">
                             <div className="space-y-2 h-72 overflow-y-auto">
                                 {/* ... logs list ... */}
-                                {filteredLogs
-                                    .filter(log => {
-                                        const d = new Date(log.timestamp);
-                                        const dayMatch = d.getDay() === selectedHeatmapCell.day && d.getHours() === selectedHeatmapCell.hour;
-                                        if (!dayMatch) return false;
-                                        if (log.value !== 'active') return false;
-                                        if (selectedHeatmapCell.date) {
-                                            return d.getFullYear() === selectedHeatmapCell.date.getFullYear() &&
-                                                d.getMonth() === selectedHeatmapCell.date.getMonth() &&
-                                                d.getDate() === selectedHeatmapCell.date.getDate();
-                                        }
-                                        return true;
-                                    })
+                                {getLogsForCell(filteredLogs, selectedHeatmapCell)
                                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
                                     .map(log => (
                                         <div key={log.id} className="p-2 border-b text-sm">
@@ -705,20 +696,9 @@ function App() {
                                         </div>
                                     ))
                                 }
-                                {filteredLogs.filter(log => {
-                                    const d = new Date(log.timestamp);
-                                    const dayMatch = d.getDay() === selectedHeatmapCell.day && d.getHours() === selectedHeatmapCell.hour;
-                                    if (!dayMatch) return false;
-                                    if (log.value !== 'active') return false;
-                                    if (selectedHeatmapCell.date) {
-                                        return d.getFullYear() === selectedHeatmapCell.date.getFullYear() &&
-                                            d.getMonth() === selectedHeatmapCell.date.getMonth() &&
-                                            d.getDate() === selectedHeatmapCell.date.getDate();
-                                    }
-                                    return true;
-                                }).length === 0 && (
-                                        <p className="text-gray-500 italic">No events found for this time slot in the current view.</p>
-                                    )}
+                                {getLogsForCell(filteredLogs, selectedHeatmapCell).length === 0 && (
+                                    <p className="text-gray-500 italic">No events found for this time slot in the current view.</p>
+                                )}
                             </div>
 
                             {/* Adjustment Button in Details Panel */}
@@ -738,11 +718,7 @@ function App() {
                                         }
 
                                         // Fallback for aggregate or missing date (shouldn't happen in non-aggregate mode with new logic)
-                                        const matchingLogs = filteredLogs.filter(log => {
-                                            const d = new Date(log.timestamp);
-                                            if (log.value !== 'active') return false;
-                                            return d.getDay() === selectedHeatmapCell.day && d.getHours() === selectedHeatmapCell.hour;
-                                        });
+                                        const matchingLogs = getLogsForCell(filteredLogs, selectedHeatmapCell);
 
                                         console.log('Matching Logs:', matchingLogs.length);
 
@@ -895,10 +871,7 @@ function App() {
                 sensorName={adjustmentTarget?.sensorId ? sensors.find(s => s.id === adjustmentTarget.sensorId)?.name : 'All Sensors'}
             />
 
-            <SettingsModal
-                isOpen={isSettingsModalOpen}
-                onClose={() => setIsSettingsModalOpen(false)}
-            />
+
         </div>
     );
 }

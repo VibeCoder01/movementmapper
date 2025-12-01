@@ -25,6 +25,7 @@ class Sensor(Base):
     unique_id = Column(String, unique=True, index=True) # Matter Node ID / Endpoint
     name = Column(String)
     type = Column(String) # e.g., "PIR", "Contact"
+    is_hidden = Column(Boolean, default=False)
 
     logs = relationship("ActivityLog", back_populates="sensor")
     anomalies = relationship("Anomaly", back_populates="sensor")
@@ -62,3 +63,15 @@ class DataAdjustment(Base):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    
+    # Migration: Add is_hidden column if it doesn't exist
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    columns = [col['name'] for col in inspector.get_columns('sensors')]
+    
+    if 'is_hidden' not in columns:
+        with engine.connect() as conn:
+            conn.execute(text('ALTER TABLE sensors ADD COLUMN is_hidden BOOLEAN DEFAULT 0'))
+            conn.commit()
+        print("Migration: Added is_hidden column to sensors table")
+

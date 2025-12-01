@@ -17,12 +17,18 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 db = SessionLocal()
 
-# Query sensors
-sensors = db.query(Sensor).all()
-print(f"Found {len(sensors)} sensors:")
-for s in sensors:
-    print(f"ID: {s.id}, Name: '{s.name}', UniqueID: '{s.unique_id}', Hidden: {s.is_hidden}")
-
-# Check for demo sensors specifically
+# Find demo sensors
 demo_sensors = db.query(Sensor).filter(Sensor.unique_id.like("demo-%")).all()
-print(f"\nFound {len(demo_sensors)} demo sensors via LIKE 'demo-%'")
+
+print(f"Found {len(demo_sensors)} demo sensors to update:")
+for sensor in demo_sensors:
+    old_name = sensor.name
+    # Add (Demo) suffix if not already present
+    if not sensor.name.endswith(" (Demo)"):
+        sensor.name = sensor.name + " (Demo)"
+        print(f"  ID {sensor.id}: '{old_name}' -> '{sensor.name}'")
+    else:
+        print(f"  ID {sensor.id}: '{sensor.name}' (already has suffix)")
+
+db.commit()
+print("\nDatabase updated successfully!")

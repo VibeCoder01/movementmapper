@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const SettingsModal = ({ isOpen, onClose, onGenerateDemo, onClearDemo, onFetchHistorical, demoLoading }) => {
+const SettingsModal = ({ isOpen, onClose, onGenerateDemo, onClearDemo, onFetchHistorical, demoLoading, onRefreshData }) => {
+    console.log('SettingsModal props:', { onGenerateDemo, onClearDemo, onFetchHistorical });
+
     const [ip, setIp] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -12,14 +14,61 @@ const SettingsModal = ({ isOpen, onClose, onGenerateDemo, onClearDemo, onFetchHi
     const [logsLoading, setLogsLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [status, setStatus] = useState(null);
+    const [sensors, setSensors] = useState([]);
+    const [originalSensors, setOriginalSensors] = useState([]);
+    const [hasChanges, setHasChanges] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             fetchConfig();
             fetchStatus();
+            fetchSensors();
             setShowLogs(false); // Reset logs view when opening modal
         }
     }, [isOpen]);
+
+    const fetchSensors = async () => {
+        try {
+            const response = await axios.get('/api/sensors');
+            setSensors(response.data);
+            setOriginalSensors(JSON.parse(JSON.stringify(response.data))); // Deep copy
+            setHasChanges(false);
+        } catch (error) {
+            console.error('Error fetching sensors:', error);
+        }
+    };
+
+    const handleCancel = () => {
+        // Revert all sensor changes
+        setSensors(JSON.parse(JSON.stringify(originalSensors)));
+        setHasChanges(false);
+        onClose();
+    };
+
+    const handleOk = async () => {
+        if (hasChanges) {
+            // Apply all changes
+            try {
+                for (const sensor of sensors) {
+                    const original = originalSensors.find(s => s.id === sensor.id);
+                    if (original && original.is_hidden !== sensor.is_hidden) {
+                        await axios.patch(`/api/sensors/${sensor.id}`, {
+                            is_hidden: sensor.is_hidden
+                        });
+                    }
+                }
+                if (onRefreshData) {
+                    await onRefreshData();
+                }
+                setHasChanges(false);
+            } catch (error) {
+                console.error('Error saving sensor changes:', error);
+                setMessage({ type: 'error', text: 'Failed to save sensor changes' });
+                return;
+            }
+        }
+        onClose();
+    };
 
     const fetchStatus = async () => {
         try {
@@ -197,29 +246,92 @@ const SettingsModal = ({ isOpen, onClose, onGenerateDemo, onClearDemo, onFetchHi
                         <hr className="my-4 border-gray-200" />
 
                         <div className="mt-4">
+                            <h3 className="text-lg font-semibold mb-3 text-gray-800">Sensor Visibility</h3>
+                            <p className="text-sm text-gray-600 mb-3">Check the sensors you want to display on the main screen</p>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {sensors.length > 0 ? (
+                                    sensors.map(sensor => (
+                                        <div key={sensor.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded">
+                                            <input
+                                                type="checkbox"
+                                                checked={!sensor.is_hidden}
+                                                onChange={(e) => {
+                                                    // Update local state only
+                                                    setSensors(prevSensors =>
+                                                        prevSensors.map(s =>
+                                                            s.id === sensor.id
+                                                                ? { ...s, is_hidden: !e.target.checked }
+                                                                : s
+                                                        )
+                                                    );
+                                                    setHasChanges(true);
+                                                }}
+                                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                            />
+                                            <div className="flex-1">
+                                                <div className="font-medium text-gray-900">{sensor.name}</div>
+                                                <div className="text-xs text-gray-500">{sensor.type}</div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-gray-500 italic text-sm">No sensors available</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <hr className="my-4 border-gray-200" />
+
+                        <div className="mt-4">
                             <h3 className="text-lg font-semibold mb-3 text-gray-800">Data Management</h3>
-                            <div className="flex flex-col gap-2">
+                            <div className="flex gap-2 mb-2">
                                 <button
-                                    onClick={onGenerateDemo}
+                                    onClick={async () => {
+                                        try {
+                                            await onGenerateDemo();
+                                            // Wait a moment for the backend to finish writing
+                                            await new Promise(resolve => setTimeout(resolve, 1000));
+                                            await fetchSensors();
+                                        } catch (error) {
+                                            console.error('Error in demo generation:', error);
+                                        }
+                                    }}
                                     disabled={demoLoading}
-                                    className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 text-sm font-medium"
+                                    className="flex-1 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
                                 >
-                                    {demoLoading ? 'Generating...' : 'Generate Demo Data'}
+                                    {demoLoading ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Generating...
+                                        </>
+                                    ) : 'Generate Demo Data'}
                                 </button>
                                 <button
-                                    onClick={onClearDemo}
+                                    onClick={async () => {
+                                        try {
+                                            await onClearDemo();
+                                            // Wait a moment for the backend to finish
+                                            await new Promise(resolve => setTimeout(resolve, 500));
+                                            await fetchSensors();
+                                        } catch (error) {
+                                            console.error('Error in demo clearing:', error);
+                                        }
+                                    }}
                                     disabled={demoLoading}
-                                    className="w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 text-sm font-medium"
+                                    className="flex-1 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 text-sm font-medium"
                                 >
                                     Clear Demo Data
                                 </button>
-                                <button
-                                    onClick={onFetchHistorical}
-                                    className="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm font-medium"
-                                >
-                                    Fetch Historical Data
-                                </button>
                             </div>
+                            <button
+                                onClick={onFetchHistorical}
+                                className="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm font-medium"
+                            >
+                                Fetch Historical Data
+                            </button>
                         </div>
 
                         <hr className="my-4 border-gray-200" />
@@ -238,29 +350,36 @@ const SettingsModal = ({ isOpen, onClose, onGenerateDemo, onClearDemo, onFetchHi
                         </div>
                     </>
                 ) : (
-                    <>
-                        <div className="mb-4">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Backend Logs (Last 1000 lines)</h3>
-                            <pre className="bg-gray-900 text-green-400 p-4 rounded text-xs overflow-auto max-h-[60vh] font-mono">
-                                {logs}
-                            </pre>
-                        </div>
-                        <div className="flex justify-end space-x-2">
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-gray-800">Backend Logs</h3>
                             <button
                                 onClick={() => setShowLogs(false)}
-                                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                                className="text-gray-500 hover:text-gray-700"
                             >
-                                Back to Settings
-                            </button>
-                            <button
-                                onClick={onClose}
-                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                            >
-                                Close
+                                ← Back
                             </button>
                         </div>
-                    </>
+                        <pre className="bg-gray-100 p-4 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
+                            {logs}
+                        </pre>
+                    </div>
                 )}
+
+                <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-200">
+                    <button
+                        onClick={handleCancel}
+                        className="px-6 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded font-medium"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleOk}
+                        className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+                    >
+                        OK
+                    </button>
+                </div>
             </div>
         </div>
     );

@@ -131,7 +131,22 @@ def read_root():
 @app.get("/sensors", response_model=List[dict])
 def read_sensors(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     sensors = db.query(Sensor).offset(skip).limit(limit).all()
-    return [{"id": s.id, "name": s.name, "unique_id": s.unique_id, "type": s.type} for s in sensors]
+    return [{"id": s.id, "name": s.name, "unique_id": s.unique_id, "type": s.type, "is_hidden": s.is_hidden} for s in sensors]
+
+class SensorUpdate(BaseModel):
+    is_hidden: bool
+
+@app.patch("/sensors/{sensor_id}")
+def update_sensor(sensor_id: int, sensor_update: SensorUpdate, db: Session = Depends(get_db)):
+    sensor = db.query(Sensor).filter(Sensor.id == sensor_id).first()
+    if not sensor:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    
+    sensor.is_hidden = sensor_update.is_hidden
+    db.commit()
+    db.refresh(sensor)
+    
+    return {"id": sensor.id, "name": sensor.name, "is_hidden": sensor.is_hidden, "message": "Sensor updated successfully"}
 
 @app.get("/logs", response_model=List[dict])
 def read_logs(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -220,9 +235,9 @@ def generate_demo_data(db: Session = Depends(get_db)):
     
     # Create demo sensors
     demo_sensors = [
-        {"unique_id": "demo-living-room", "name": "Living Room Motion", "type": "PIR"},
-        {"unique_id": "demo-kitchen", "name": "Kitchen Motion", "type": "PIR"},
-        {"unique_id": "demo-bedroom", "name": "Bedroom Motion", "type": "PIR"},
+        {"unique_id": "demo-living-room", "name": "Living Room Motion (Demo)", "type": "PIR", "is_hidden": False},
+        {"unique_id": "demo-kitchen", "name": "Kitchen Motion (Demo)", "type": "PIR", "is_hidden": False},
+        {"unique_id": "demo-bedroom", "name": "Bedroom Motion (Demo)", "type": "PIR", "is_hidden": False},
     ]
     
     sensor_ids = []
@@ -231,8 +246,13 @@ def generate_demo_data(db: Session = Depends(get_db)):
         if not sensor:
             sensor = Sensor(**sensor_data)
             db.add(sensor)
-            db.commit()
-            db.refresh(sensor)
+        else:
+            # Update existing sensor
+            sensor.name = sensor_data["name"]
+            sensor.is_hidden = sensor_data.get("is_hidden", False)
+        
+        db.commit()
+        db.refresh(sensor)
         sensor_ids.append(sensor.id)
     
     # Generate 30 days of activity with weekly variations
@@ -347,6 +367,8 @@ def generate_demo_data(db: Session = Depends(get_db)):
 @app.post("/demo/clear")
 def clear_demo_data(db: Session = Depends(get_db)):
     """Clear all demo data"""
+    from database import DataAdjustment
+    
     # Find demo sensors
     demo_sensors = db.query(Sensor).filter(
         Sensor.unique_id.like("demo-%")
@@ -354,19 +376,24 @@ def clear_demo_data(db: Session = Depends(get_db)):
     
     logs_deleted = 0
     anomalies_deleted = 0
+    adjustments_deleted = 0
+    sensors_deleted = 0
     
     for sensor in demo_sensors:
-        logs_deleted += db.query(ActivityLog).filter(ActivityLog.sensor_id == sensor.id).delete()
-        anomalies_deleted += db.query(Anomaly).filter(Anomaly.sensor_id == sensor.id).delete()
+        logs_deleted += db.query(ActivityLog).filter(ActivityLog.sensor_id == sensor.id).delete(synchronize_session=False)
+        anomalies_deleted += db.query(Anomaly).filter(Anomaly.sensor_id == sensor.id).delete(synchronize_session=False)
+        adjustments_deleted += db.query(DataAdjustment).filter(DataAdjustment.sensor_id == sensor.id).delete(synchronize_session=False)
+        db.delete(sensor)
+        sensors_deleted += 1
     
-    sensors_deleted = db.query(Sensor).filter(Sensor.unique_id.like("demo-%")).delete()
     db.commit()
     
     return {
         "message": "Demo data cleared successfully",
         "sensors_deleted": sensors_deleted,
         "logs_deleted": logs_deleted,
-        "anomalies_deleted": anomalies_deleted
+        "anomalies_deleted": anomalies_deleted,
+        "adjustments_deleted": adjustments_deleted
     }
 
 @app.post("/sensors/refresh")
