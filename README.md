@@ -5,13 +5,16 @@
 ## Features
 
 *   **Real-time Activity Logging**: Connects directly to your Tapo Hub to capture motion events in real-time.
-*   **Interactive Heatmap**: Visualize activity intensity by hour and day of the week.
+*   **Interactive Heatmap**: Visualize activity intensity by hour and day of the week with dynamic color gradients.
 *   **Aggregate View**: Combine data from multiple weeks to identify consistent routines and long-term trends.
 *   **Sum Mode**: In Aggregate View, toggle "Sum Mode" to see the total activity count for each hour, providing a clear heat-map of high-traffic times.
-*   **Data Adjustments**: Manually adjust data points to correct false positives or anomalies directly from the dashboard.
+*   **Data Adjustments**: Manually adjust data points to correct false positives or anomalies directly from the dashboard, with visual indicators for adjusted cells.
+*   **Sensor Visibility Management**: Show or hide individual sensors from the main display while retaining their data.
+*   **Demo Data Generation**: Generate realistic demo data with weekday/weekend patterns for testing and demonstration purposes.
 *   **Sensor Management**: Manually refresh sensor list to detect newly added devices immediately.
 *   **Diagnostics**: View backend logs directly from the settings panel for troubleshooting.
 *   **Privacy Focused**: All data is stored locally in a SQLite database. No external cloud dependency for data storage.
+*   **Clean Codebase**: Refactored with helper functions to reduce duplication and improve maintainability.
 
 ## Getting Started
 
